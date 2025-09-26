@@ -99,37 +99,45 @@ public class SteeringBehavior : MonoBehaviour
     
     public void ApplyHoverEffect()
     {
-        float hover = Mathf.Sin(Time.time * 5.0f) * 0.035f;
-        Vector3 currentPos = transform.localPosition;
-        transform.localPosition = new Vector3(currentPos.x, currentPos.y + hover, currentPos.z);
-        
-        float rotationAmount = Mathf.Sin(Time.time * 8.0f) * 10.0f; 
-        //transform.localRotation = Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount);
-        
-        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount), 0.25f);
+        float hover = Mathf.Sin(Time.time * 5.0f) * 5f;
+        Vector3 targetPos = Vector3.zero + Vector3.up * hover;
+        transform.localPosition = Vector3.Lerp(transform.localPosition, targetPos, 0.25f);
+    
+        float rotationAmount = Mathf.Sin(Time.time * 8.0f) * 10.0f;
+        Vector3 targetRotation = originalRotation + Vector3.forward * rotationAmount;
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(targetRotation), 0.25f);
     }
 
     public void ApplyShakingEffect()
     {
-        float rotationAmount = Mathf.Sin(Time.time * 12.0f) * 20.0f;
-        transform.localRotation = Quaternion.Euler(originalRotation.x + rotationAmount , originalRotation.y , originalRotation.z);
-        
-        Vector3 currentPos = transform.localPosition;
-        transform.localPosition = new Vector3(currentPos.x + rotationAmount * 0.01f, currentPos.y , currentPos.z);
-    }
+        float rotationAmount = Mathf.Sin(Time.time * 40.0f) * 1.5f;
+        Vector3 targetRotation = originalRotation + Vector3.forward * rotationAmount;
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(targetRotation), 0.25f);
     
+        /*
+        float swingAmount = Mathf.Sin(Time.time * 40.0f) * 0.025f; 
+        Vector3 targetPos = Vector3.zero + Vector3.right * swingAmount;
+        transform.localPosition = Vector3.Lerp(transform.localPosition, targetPos, 0.25f);
+        */
+    }
+
     public void ApplyDefendingEffect()
     {
-        float rotationAmount = Mathf.Sin(Time.time * 1.0f) *5.0f;
-        transform.localRotation = Quaternion.Euler(originalRotation.x + rotationAmount , originalRotation.y , originalRotation.z);
+        /*
+        float rotationAmount = Mathf.Sin(Time.time * 1.0f) * 15.0f;
+        Vector3 targetRotation = originalRotation + Vector3.right * rotationAmount; 
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(targetRotation), 0.25f);
+        */
         
-        Vector3 currentPos = transform.localPosition;
-        transform.localPosition = new Vector3(currentPos.x + rotationAmount * 0.01f, currentPos.y , currentPos.z);
+        float swingAmount = Mathf.Cos(Time.time * 5.0f) * 1f; 
+        Vector3 targetPos = Vector3.zero + Vector3.right * swingAmount;
+        transform.localPosition = Vector3.Lerp(transform.localPosition, targetPos, 0.5f);
     }
 
     public void ApplyMovingEffect()
     {
-        float rotationAmount = Mathf.Sin(Time.time * 8.0f) * 5.0f; 
-        transform.localRotation = Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount);
+        float rotationAmount = Mathf.Sin(Time.time * 8.0f) * 5.0f;
+        Vector3 targetRotation = originalRotation + Vector3.forward * rotationAmount;
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(targetRotation), 0.25f);
     }
 }

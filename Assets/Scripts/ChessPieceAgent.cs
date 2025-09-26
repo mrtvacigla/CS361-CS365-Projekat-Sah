@@ -108,7 +108,22 @@ public class ChessPieceAgent : MonoBehaviour
     
     public void SetState(PieceState newState)
     {
+        var previousState = currentState;
+    
+        if (previousState == PieceState.Selected && newState == PieceState.Idle)
+        {
+            var steeringBehavior = GetComponent<SteeringBehavior>();
+            if (steeringBehavior != null)
+            {
+                steeringBehavior.ResetToCenter();
+            }
+        }
         currentState = newState;
+    
+        if (newState == PieceState.Idle && currentState != PieceState.Selected )
+        {
+            CheckForThreats();
+        }
     }
     
     private void CheckForThreats()
@@ -119,25 +134,25 @@ public class ChessPieceAgent : MonoBehaviour
         bool wasUnderThreat = isUnderThreat;
         isUnderThreat = board.IsPositionUnderAttack(chessPiece.position, enemyColor);
         
-        if (isUnderThreat && !wasUnderThreat && currentState != PieceState.Moving)
+        if (isUnderThreat && currentState != PieceState.Moving && currentState != PieceState.Selected)
         {
             SetState(PieceState.UnderThreat);
         }
-        else if (!isUnderThreat && wasUnderThreat && currentState == PieceState.UnderThreat)
+        else if (!isUnderThreat && currentState == PieceState.UnderThreat)
         {
             SetState(PieceState.Idle);
         }
+
     }
     
     private void OnThreatReceived(Vector2Int threatPosition, PieceColor attackerColor)
     {
-        if (chessPiece.color != attackerColor && currentState == PieceState.Idle)
+        if (chessPiece.color != attackerColor && currentState == PieceState.Idle && currentState != PieceState.Selected)
         {
             float distance = Vector2Int.Distance(chessPiece.position, threatPosition);
             if (distance <= threatRadius)
             {
-                SetState(PieceState.Defending);
-                
+                SetState(PieceState.UnderThreat);
             }
         }
     }

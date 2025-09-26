@@ -98,6 +98,7 @@ public class ChessGameManager : MonoBehaviour
         validMoves = chessBoard.GetValidMoves(piece);
     
         piece.GetComponent<ChessPieceAgent>().SetState(PieceState.Selected);
+        Debug.Log("Selected");
     
         uiManager.HighlightValidMoves(validMoves);
         statusText.text = $"Selected {piece.type} at {piece.position}";
@@ -144,7 +145,6 @@ public class ChessGameManager : MonoBehaviour
         uiManager.MovePieceVisually(piece, targetPosition);
         piece.hasMoved = true;
         
-        pieceAgent.SetState(PieceState.Idle);
         DeselectPiece();
         
         if (chessBoard.IsCheckmate(PieceColor.Black))
@@ -167,7 +167,9 @@ public class ChessGameManager : MonoBehaviour
         foreach (var waypoint in path)
         {
             Vector3 worldPos = uiManager.GetWorldPosition(waypoint);
+            
             yield return StartCoroutine(steeringBehavior.MoveTo(worldPos));
+            
         }
     }
     
