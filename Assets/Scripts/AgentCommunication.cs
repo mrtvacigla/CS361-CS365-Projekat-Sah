@@ -15,8 +15,6 @@ public class AgentCommunication : MonoBehaviour
     {
         Debug.Log($"Threat broadcast at {position} by {attackerColor}");
         OnThreatBroadcast?.Invoke(position, attackerColor);
-        
-        // Visual feedback
         StartCoroutine(ShowThreatIndicator(position));
     }
     
@@ -34,12 +32,10 @@ public class AgentCommunication : MonoBehaviour
     
     private System.Collections.IEnumerator ShowThreatIndicator(Vector2Int position)
     {
-        // Create visual indicator for threat
         var uiManager = ChessGameManager.Instance.GetComponent<ChessUIManager>();
         yield return StartCoroutine(uiManager.ShowThreatEffect(position));
     }
     
-    // Method to check if pieces can communicate based on distance
     public bool CanCommunicate(Vector2Int pos1, Vector2Int pos2)
     {
         float distance = Vector2Int.Distance(pos1, pos2);
