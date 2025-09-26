@@ -121,6 +121,8 @@ public class ChessGameManager : MonoBehaviour
     
     private IEnumerator ExecuteMove(ChessPiece piece, Vector2Int targetPosition)
     {
+        uiManager.ClearHighlights();
+        
         var pieceAgent = piece.GetComponent<ChessPieceAgent>();
         pieceAgent.SetState(PieceState.Moving);
         

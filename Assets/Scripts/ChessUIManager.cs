@@ -11,7 +11,7 @@ public class ChessUIManager : MonoBehaviour
     public Transform boardParent;
     public Color lightSquareColor = Color.white;
     public Color darkSquareColor = Color.gray;
-    public Color highlightColor = Color.green;
+    public Sprite highlightSprite;
     public Color threatColor = Color.red;
     
     private Button[,] squareButtons = new Button[8, 8];
@@ -45,14 +45,14 @@ public class ChessUIManager : MonoBehaviour
         Button button = squareObj.GetComponent<Button>();
         Image image = squareObj.GetComponent<Image>();
         bool isLightSquare = (x + y) % 2 == 0;
-        image.color = isLightSquare ? lightSquareColor : darkSquareColor;
+        image.color = new Color(0, 0, 0, 0);
         int capturedX = x, capturedY = y;
         button.onClick.AddListener(() => ChessGameManager.Instance.OnSquareClicked(capturedX, capturedY));
         
         squareButtons[x, y] = button;
         squareObj.name = $"Square_{(char)('a' + x)}{y + 1}";
     }
-    
+
     public void InitializeBoard()
     {
         foreach (var pieceObj in pieceObjects.Values)
@@ -60,10 +60,11 @@ public class ChessUIManager : MonoBehaviour
             if (pieceObj != null)
                 Destroy(pieceObj);
         }
+
         pieceObjects.Clear();
-        
+
         var board = ChessGameManager.Instance.GetBoard();
-        
+
         for (int x = 0; x < 8; x++)
         {
             for (int y = 0; y < 8; y++)
@@ -77,46 +78,47 @@ public class ChessUIManager : MonoBehaviour
         }
     }
     
-    public void UpdateBoardDisplay()
-    {
-        var board = ChessGameManager.Instance.GetBoard();
-        for (int x = 0; x < 8; x++)
-        {
-            for (int y = 0; y < 8; y++)
-            {
-                var piece = board.GetPiece(new Vector2Int(x, y));
-                Vector2Int boardPos = new Vector2Int(x, y);
-                
-                if (piece != null && pieceObjects.ContainsKey(piece))
-                {
-                    var pieceObj = pieceObjects[piece];
-                    if (pieceObj != null)
-                    {
-                        var correctParent = squareButtons[x, y].transform;
-                        if (pieceObj.transform.parent != correctParent)
-                        {
-                            pieceObj.transform.SetParent(correctParent);
-                            pieceObj.transform.localPosition = Vector3.zero;
-                            pieceObj.transform.localRotation = Quaternion.Euler(Vector3.zero);
-                        }
-                    }
-                }
-            }
-        }
-    }
+
     public void ResetPiecePosition(ChessPiece piece)
     {
         if (piece == null || !pieceObjects.ContainsKey(piece))
             return;
-        
+    
         var pieceObj = pieceObjects[piece];
         if (pieceObj == null)
             return;
-    
-        pieceObj.transform.localPosition = Vector3.zero;
-        pieceObj.transform.localRotation = Quaternion.Euler(0,0,0);
-        pieceObj.transform.rotation = Quaternion.Euler(0,0,0);
+
+        StopCoroutine(nameof(ResetPiecePositionSmooth));
+
+        StartCoroutine(ResetPiecePositionSmooth(pieceObj));
     }
+
+    private IEnumerator ResetPiecePositionSmooth(GameObject pieceObj)
+    {
+        Vector3 startPos = pieceObj.transform.localPosition;
+        Quaternion startRot = pieceObj.transform.localRotation;
+    
+        Vector3 targetPos = Vector3.zero;
+        Quaternion targetRot = Quaternion.Euler(0, 0, 0);
+
+        float duration = 0.5f;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+
+            pieceObj.transform.localPosition = Vector3.Lerp(startPos, targetPos, t);
+            pieceObj.transform.localRotation = Quaternion.Slerp(startRot, targetRot, t);
+
+            yield return null;
+        }
+
+        pieceObj.transform.localPosition = targetPos;
+        pieceObj.transform.localRotation = targetRot;
+    }
+
     private void CreatePieceObject(PieceSetupData setupData, int x, int y)
     {
         GameObject pieceObj = Instantiate(chessPiecePrefab, squareButtons[x, y].transform);
@@ -199,7 +201,8 @@ public class ChessUIManager : MonoBehaviour
         {
             var button = squareButtons[move.x, move.y];
             var image = button.GetComponent<Image>();
-            image.color = highlightColor;
+            image.color = new  Color(0,0, 0, 255);
+            image.sprite = highlightSprite;
         }
     }
     
@@ -212,8 +215,8 @@ public class ChessUIManager : MonoBehaviour
                 var button = squareButtons[x, y];
                 var image = button.GetComponent<Image>();
                 
-                bool isLightSquare = (x + y) % 2 == 0;
-                image.color = isLightSquare ? lightSquareColor : darkSquareColor;
+                image.color = new  Color(0, 0, 0, 0);
+                image.sprite = null;
             }
         }
     }

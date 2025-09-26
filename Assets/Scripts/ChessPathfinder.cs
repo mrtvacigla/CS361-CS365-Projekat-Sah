@@ -15,8 +15,11 @@ public class ChessPathfinder : MonoBehaviour
     public List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
     {
         board = ChessGameManager.Instance.GetBoard();
+        return FindPathAStar(start, goal);
         
-        if (chessPiece.type == PieceType.Knight || RequiresPathfinding(start, goal))
+        /*
+         * if (chessPiece.type == PieceType.Knight || RequiresPathfinding(start, goal))
+         
         {
             return FindPathAStar(start, goal);
         }
@@ -24,6 +27,7 @@ public class ChessPathfinder : MonoBehaviour
         {
             return new List<Vector2Int> { goal };
         }
+        */
     }
     
     private bool RequiresPathfinding(Vector2Int start, Vector2Int goal)

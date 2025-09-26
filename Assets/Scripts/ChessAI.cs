@@ -15,7 +15,7 @@ public class ChessAI : MonoBehaviour
     [Header("AI Settings")]
     public AIState currentState = AIState.Idle;
     public int searchDepth = 5;
-    public float thinkingTime = 0.5f;
+    public float thinkingTime = 1f;
     
     private ChessBoard board;
     private AgentCommunication communication;

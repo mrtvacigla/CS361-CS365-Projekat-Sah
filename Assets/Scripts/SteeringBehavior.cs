@@ -104,7 +104,9 @@ public class SteeringBehavior : MonoBehaviour
         transform.localPosition = new Vector3(currentPos.x, currentPos.y + hover, currentPos.z);
         
         float rotationAmount = Mathf.Sin(Time.time * 8.0f) * 10.0f; 
-        transform.localRotation = Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount);
+        //transform.localRotation = Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount);
+        
+        transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(originalRotation.x, originalRotation.y, originalRotation.z + rotationAmount), 0.25f);
     }
 
     public void ApplyDefendingEffect()
