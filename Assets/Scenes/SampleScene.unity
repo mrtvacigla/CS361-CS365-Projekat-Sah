@@ -5305,7 +5305,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentState: 0
   searchDepth: 3
-  thinkingTime: 2
+  thinkingTime: 0.5
 --- !u!114 &1281601763
 MonoBehaviour:
   m_ObjectHideFlags: 0

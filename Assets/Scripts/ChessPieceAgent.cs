@@ -98,6 +98,7 @@ public class ChessPieceAgent : MonoBehaviour
     private void HandleThreatState()
     {
         communication.RequestDefense(chessPiece.position, chessPiece.color);
+        steeringBehavior.ApplyShakingEffect();
     }
     
     private void HandleDefendingState()
@@ -151,6 +152,7 @@ public class ChessPieceAgent : MonoBehaviour
                 SetState(PieceState.Defending);
                 
             }
+            
         }
     }
     
