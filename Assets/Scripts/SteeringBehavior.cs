@@ -128,7 +128,6 @@ public class SteeringBehavior : MonoBehaviour
         Vector3 targetRotation = originalRotation + Vector3.right * rotationAmount; 
         transform.localRotation = Quaternion.Lerp(transform.localRotation, Quaternion.Euler(targetRotation), 0.25f);
         */
-        
         float swingAmount = Mathf.Cos(Time.time * 5.0f) * 1f; 
         Vector3 targetPos = Vector3.zero + Vector3.right * swingAmount;
         transform.localPosition = Vector3.Lerp(transform.localPosition, targetPos, 0.5f);

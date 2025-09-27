@@ -120,7 +120,7 @@ public class ChessPieceAgent : MonoBehaviour
         }
         currentState = newState;
     
-        if (newState == PieceState.Idle && currentState != PieceState.Selected )
+        if ((newState == PieceState.Idle && currentState != PieceState.Selected) || (previousState == PieceState.Selected && newState == PieceState.Idle) )
         {
             CheckForThreats();
         }

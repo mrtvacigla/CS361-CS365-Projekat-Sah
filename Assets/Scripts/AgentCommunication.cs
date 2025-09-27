@@ -13,20 +13,17 @@ public class AgentCommunication : MonoBehaviour
     
     public void BroadcastThreat(Vector2Int position, PieceColor attackerColor)
     {
-        Debug.Log($"Threat broadcast at {position} by {attackerColor}");
         OnThreatBroadcast?.Invoke(position, attackerColor);
         StartCoroutine(ShowThreatIndicator(position));
     }
     
     public void RequestDefense(Vector2Int position, PieceColor allyColor)
     {
-        Debug.Log($"Defense requested at {position} by {allyColor}");
         OnDefenseRequest?.Invoke(position, allyColor);
     }
     
     public void SecurePosition(Vector2Int position, PieceColor controllingColor)
     {
-        Debug.Log($"Position {position} secured by {controllingColor}");
         OnPositionSecured?.Invoke(position, controllingColor);
     }
     
