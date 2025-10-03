@@ -1,27 +1,18 @@
 using UnityEngine;
 using System.Collections;
 
-public enum PieceState
-{
-    Idle,
-    Selected,
-    Moving,
-    UnderThreat,
-    Captured,
-    Defending
-}
-
 public class ChessPieceAgent : MonoBehaviour
 {
     [Header("Agent Properties")]
-    public PieceState currentState = PieceState.Idle;
     public float threatRadius = 2.0f;
     public bool isUnderThreat = false;
     
-    private ChessPiece chessPiece;
-    private SteeringBehavior steeringBehavior;
-    private AgentCommunication communication;
+    public ChessPiece chessPiece { get; private set; }
+    public SteeringBehavior steeringBehavior { get; private set; }
+    public AgentCommunication communication { get; private set; }
     
+    private IChessPieceState _currentState;
+
     private void Awake()
     {
         StartCoroutine(WaitForLoading());
@@ -37,147 +28,42 @@ public class ChessPieceAgent : MonoBehaviour
    
         communication.OnThreatBroadcast += OnThreatReceived;
         communication.OnDefenseRequest += OnDefenseRequested;
-     
+
+        // Set initial state
+        SetState(new IdleState());
     }
 
     
     private void Update()
     {
-        UpdateStateMachine();
-        CheckForThreats();
+        _currentState?.HandleUpdate(this);
+        _currentState?.CheckThreatStatus(this);
     }
     
-    private void UpdateStateMachine()
+    public void SetState(IChessPieceState newState)
     {
-        switch (currentState)
-        {
-            case PieceState.Idle:
-                HandleIdleState();
-                break;
-            case PieceState.Selected:
-                HandleSelectedState();
-                break;
-            case PieceState.Moving:
-                HandleMovingState();
-                break;
-            case PieceState.UnderThreat:
-                HandleThreatState();
-                break;
-            case PieceState.Defending:
-                HandleDefendingState();
-                break;
-        }
+        _currentState?.OnExitState(this);
+        _currentState = newState;
+        _currentState.OnEnterState(this);
     }
     
-    private void HandleIdleState()
-    {
-        var steeringBehavior = GetComponent<SteeringBehavior>();
-        if (steeringBehavior != null)
-        {
-            steeringBehavior.StopMovement();
-        
-            if (Vector3.Distance(transform.localPosition, Vector3.zero) > 0.1f)
-            {
-                transform.localPosition = Vector3.Lerp(transform.localPosition, Vector3.zero, Time.deltaTime * 5f);
-            }
-            transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
-        }
-    
-    }
 
-    
-    private void HandleSelectedState()
-    {
-        steeringBehavior.ApplyHoverEffect();
-    }
-    
-    private void HandleMovingState()
-    {
-        steeringBehavior.ApplyMovingEffect();
-    }
-    
-    private void HandleThreatState()
-    {
-        communication.RequestDefense(chessPiece.position, chessPiece.color);
-        steeringBehavior.ApplyShakingEffect();
-    }
-    
-    private void HandleDefendingState()
-    {
-        steeringBehavior.ApplyDefendingEffect();
-    }
-    
-    public void SetState(PieceState newState)
-    {
-        var previousState = currentState;
-    
-        if (previousState == PieceState.Selected && newState == PieceState.Idle)
-        {
-            var steeringBehavior = GetComponent<SteeringBehavior>();
-            if (steeringBehavior != null)
-            {
-                steeringBehavior.ResetToCenter();
-            }
-        }
-        currentState = newState;
-    
-        if ((newState == PieceState.Idle && currentState != PieceState.Selected) || (previousState == PieceState.Selected && newState == PieceState.Idle) )
-        {
-            CheckForThreats();
-        }
-    }
-    
-    private void CheckForThreats()
-    {
-        var board = ChessGameManager.Instance.GetBoard();
-        var enemyColor = chessPiece.color == PieceColor.White ? PieceColor.Black : PieceColor.White;
-        
-        bool wasUnderThreat = isUnderThreat;
-        isUnderThreat = board.IsPositionUnderAttack(chessPiece.position, enemyColor);
-        
-        if (isUnderThreat && currentState != PieceState.Moving && currentState != PieceState.Selected)
-        {
-            SetState(PieceState.UnderThreat);
-        }
-        else if (!isUnderThreat && currentState == PieceState.UnderThreat)
-        {
-            SetState(PieceState.Idle);
-        }
-
-    }
-    
     private void OnThreatReceived(Vector2Int threatPosition, PieceColor attackerColor)
     {
-        if (chessPiece.color != attackerColor && currentState == PieceState.Idle && currentState != PieceState.Selected)
-        {
-            float distance = Vector2Int.Distance(chessPiece.position, threatPosition);
-            if (distance <= threatRadius)
-            {
-                SetState(PieceState.UnderThreat);
-            }
-        }
+        _currentState?.OnThreatBroadcastReceived(this, threatPosition, attackerColor);
     }
     
     private void OnDefenseRequested(Vector2Int position, PieceColor allyColor)
     {
-        if (chessPiece.color == allyColor && currentState == PieceState.Idle)
-        {
-            float distance = Vector2Int.Distance(chessPiece.position, position);
-            if (distance <= threatRadius)
-            {
-                SetState(PieceState.Defending);
-                
-            }
-            
-        }
+        _currentState?.OnDefenseBroadcastReceived(this, position, allyColor);
     }
     
     private IEnumerator DefendFor(float duration)
     {
         yield return new WaitForSeconds(duration);
-        if (currentState == PieceState.Defending)
+        if (_currentState is DefendingState)
         {
-            SetState(PieceState.Idle);
+            SetState(new IdleState());
         }
     }
     

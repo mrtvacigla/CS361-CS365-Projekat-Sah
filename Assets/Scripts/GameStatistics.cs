@@ -131,8 +131,10 @@ public class GameStatistics : MonoBehaviour
                 Debug.Log($"Before White Capture: whitePiecesCaptured={whitePiecesCaptured}, blackPiecesLost={blackPiecesLost}, whiteCapturedByType[{capturedPiece.type}]={whitePiecesCapturedByType[capturedPiece.type]}, blackLostByType[{capturedPiece.type}]={blackPiecesLostByType[capturedPiece.type]}, whiteMaterialScore={whiteMaterialScore}, blackMaterialScore={blackMaterialScore}");
                 whitePiecesCaptured++;
                 whitePiecesCapturedByType[capturedPiece.type]++;
+                Debug.Log($"White player captured {capturedPiece.type}. Black pieces lost of type {capturedPiece.type} before increment: {blackPiecesLostByType[capturedPiece.type]}");
                 blackPiecesLost++;
                 blackPiecesLostByType[capturedPiece.type]++;
+                Debug.Log($"Black pieces lost of type {capturedPiece.type} after increment: {blackPiecesLostByType[capturedPiece.type]}");
                 whiteMaterialScore += capturedValue;
                 blackMaterialScore -= capturedValue;
                 totalCaptures++;
@@ -154,8 +156,10 @@ public class GameStatistics : MonoBehaviour
                 Debug.Log($"Before Black Capture: blackPiecesCaptured={blackPiecesCaptured}, whitePiecesLost={whitePiecesLost}, blackCapturedByType[{capturedPiece.type}]={blackPiecesCapturedByType[capturedPiece.type]}, whiteLostByType[{capturedPiece.type}]={whitePiecesLostByType[capturedPiece.type]}, whiteMaterialScore={whiteMaterialScore}, blackMaterialScore={blackMaterialScore}");
                 blackPiecesCaptured++;
                 blackPiecesCapturedByType[capturedPiece.type]++;
+                Debug.Log($"Black player captured {capturedPiece.type}. White pieces lost of type {capturedPiece.type} before increment: {whitePiecesLostByType[capturedPiece.type]}");
                 whitePiecesLost++;
                 whitePiecesLostByType[capturedPiece.type]++;
+                Debug.Log($"White pieces lost of type {capturedPiece.type} after increment: {whitePiecesLostByType[capturedPiece.type]}");
                 blackMaterialScore += capturedValue;
                 whiteMaterialScore -= capturedValue;
                 totalCaptures++;
@@ -191,7 +195,7 @@ public class GameStatistics : MonoBehaviour
         float evalDrop = Mathf.Abs(currentEval - previousBoardEvaluation);
         Debug.Log($"Blunder Check: evalDrop={evalDrop}");
         
-        if (evalDrop > 3.0f)
+        if (evalDrop > 5.0f)
         {
             if (player == PlayerTurn.White)
             {
@@ -208,14 +212,134 @@ public class GameStatistics : MonoBehaviour
     
     private float GetCurrentBoardEvaluation()
     {
-        var ai = ChessGameManager.Instance.GetComponent<ChessAI>();
-        if (ai != null)
+        
+        PieceColor currentPlayerColor = ChessGameManager.Instance.GetCurrentTurn() == PlayerTurn.White ? PieceColor.White : PieceColor.Black;
+        var board = ChessGameManager.Instance.GetBoard();
+        if (board.IsCheckmate(currentPlayerColor))
         {
-            return ai.EvaluateCurrentPosition(ChessGameManager.Instance.GetCurrentTurn());
+            return 100000f; // Very high score for checkmating the opponent
         }
+        if (board.IsCheckmate(currentPlayerColor == PieceColor.White ? PieceColor.Black : PieceColor.White))
+        {
+            return -100000f; // Very low score if AI is checkmated
+        }
+        if (board.IsStalemate(currentPlayerColor))
+        {
+            return -50000f; // Significant penalty for stalemate
+        }
+
+        float score = 0;
+
+        // Penalty for king in check
+        if (board.IsInCheck(currentPlayerColor))
+        {
+            score -= 50f;
+        }
+        
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board.GetPiece(new Vector2Int(x, y));
+                if (piece != null)
+                {
+                    float pieceValue = GetPieceValue(piece.type);
+                    if (piece.color == currentPlayerColor)
+                        score += pieceValue;
+                    else
+                        score -= pieceValue;
+                }
+            }
+        }
+        
+        
+        // Mobility factor
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board.GetPiece(new Vector2Int(x, y));
+                if (piece != null && piece.color == currentPlayerColor)
+                {
+                    score += board.GetValidMoves(piece).Count * 0.1f; // Small bonus for each valid move
+                }
+            }
+        }
+
+        
+        Vector2Int[] centerSquares = {
+            new Vector2Int(3, 3), new Vector2Int(3, 4),
+            new Vector2Int(4, 3), new Vector2Int(4, 4)
+        };
+        
+        foreach (var square in centerSquares)
+        {
+            var piece = board.GetPiece(square);
+            if (piece != null)
+            {
+                // MODIFIKOVANO - Evaluacija na osnovu perspectiveColor
+                if (piece.color == currentPlayerColor)
+                    score += 0.3f;
+                else
+                    score -= 0.3f;
+            }
+        }
+        float kingSafetyScore = 0;
+        Vector2Int kingPosition = Vector2Int.zero;
+
+        // Find king's position
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board.GetPiece(new Vector2Int(x, y));
+                if (piece != null && piece.type == PieceType.King && piece.color == currentPlayerColor)
+                {
+                    kingPosition = piece.position;
+                    break;
+                }
+            }
+        }
+
+        // Check for pawn shield in front of the king
+        int pawnDirection = (currentPlayerColor == PieceColor.White) ? 1 : -1;
+        int frontRow = kingPosition.y + pawnDirection;
+
+        // Check squares in front of the king (left, center, right)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            Vector2Int pawnShieldPos = new Vector2Int(kingPosition.x + dx, frontRow);
+            if (board.IsValidPosition(pawnShieldPos))
+            {
+                var piece = board.GetPiece(pawnShieldPos);
+                if (piece != null && piece.type == PieceType.Pawn && piece.color == currentPlayerColor)
+                {
+                    kingSafetyScore += 0.5f; // Bonus for pawn in front of king
+                }
+                else
+                {
+                    kingSafetyScore -= 0.2f; // Penalty for missing pawn in front of king
+                }
+            }
+        }
+
+        score += kingSafetyScore;
         return 0;
     }
-    
+    public float GetPieceValue(PieceType type)
+    {
+        return type switch
+        {
+            PieceType.Pawn => 1.0f,
+            PieceType.Knight => 3.0f,
+            PieceType.Bishop => 3.0f,
+            PieceType.Rook => 5.0f,
+            PieceType.Queen => 9.0f,
+            PieceType.King => 1000.0f,
+            _ => 0
+        };
+    }
+   
     public void EndGame(string result, string condition)
     {
         matchEndTime = DateTime.Now;

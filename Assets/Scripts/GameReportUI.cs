@@ -180,7 +180,8 @@ public class GameReportUI : MonoBehaviour
         var report = GameStatistics.Instance.GenerateReport();
         string reportText = GenerateTextReport(report);
         
-        string path = Application.persistentDataPath + $"/ChessReport_{System.DateTime.Now:yyyyMMdd_HHmmss}.txt";
+        string rootPath = System.IO.Path.GetDirectoryName(Application.dataPath);
+        string path = System.IO.Path.Combine(rootPath, $"ChessReport_{System.DateTime.Now:yyyyMMdd_HHmmss}.txt");
         System.IO.File.WriteAllText(path, reportText);
         
         Debug.Log($"Report saved to: {path}");

@@ -13,15 +13,13 @@ public enum AIState
 public class ChessAI : MonoBehaviour
 {
     [Header("AI Settings")]
-    public AIState currentState = AIState.Idle;
-    public int searchDepth = 5;
-    public float thinkingTime = 1f;
     public PieceColor aiColor = PieceColor.Black; // NOVO
     
     private ChessBoard board;
     private AgentCommunication communication;
     private GameStatistics gameStats; // NOVO
     private ChessGameManager gameManager; // NOVO
+    public ChessAIOld oldAI; // NOVO
     
     private void Awake()
     {
@@ -35,133 +33,18 @@ public class ChessAI : MonoBehaviour
         communication = GetComponent<AgentCommunication>();
         gameStats = GetComponent<GameStatistics>(); // NOVO
         gameManager = ChessGameManager.Instance; // NOVO
+
+        // Retrieve AI difficulty from PlayerPrefs and set searchDepth
+        int difficulty = PlayerPrefs.GetInt("AIDifficulty", 1); // Default to Medium (index 1)
+        
     }
     
     public IEnumerator MakeAIMove()
     {
-        SetState(AIState.Analyzing);
-        
-        yield return new WaitForSeconds(thinkingTime);
-        
-        SetState(AIState.Planning);
-        
-        var bestMove = GetBestMove();
-        
-        if (bestMove != null)
-        {
-            SetState(AIState.Executing);
-            yield return StartCoroutine(ExecuteAIMove(bestMove));
-        }
-        
-        SetState(AIState.Idle);
-        ChessGameManager.Instance.OnAIMoveComplete();
+        yield return oldAI.MakeAIMoveOld();
     }
+   
     
-    private void SetState(AIState newState)
-    {
-        currentState = newState;
-        
-        string stateMessage = newState switch
-        {
-            AIState.Analyzing => "AI is analyzing the position...",
-            AIState.Planning => "AI is planning the best move...",
-            AIState.Executing => "AI is executing move...",
-            _ => "AI thinking..."
-        };
-        
-        ChessGameManager.Instance.statusText.text = stateMessage;
-    }
-    
-    private ChessMove GetBestMove()
-    {
-        var possibleMoves = GetAllPossibleMoves(aiColor); // MODIFIKOVANO
-        
-        if (possibleMoves.Count == 0)
-            return null;
-        
-        ChessMove bestMove = null;
-        float bestScore = float.MinValue;
-        
-        foreach (var move in possibleMoves)
-        {
-            var capturedPiece = board.GetPiece(move.to);
-            board.MovePiece(move.from, move.to);
-            
-            float score = Minimax(searchDepth - 1, false, float.MinValue, float.MaxValue);
-            
-            board.MovePiece(move.to, move.from);
-            if (capturedPiece != null)
-            {
-                board.SetPiece(move.to, capturedPiece);
-            }
-            
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestMove = move;
-            }
-        }
-        
-        return bestMove;
-    }
-    
-    private float Minimax(int depth, bool maximizing, float alpha, float beta)
-    {
-        if (depth == 0 || IsGameOver())
-        {
-            PieceColor perspective = maximizing ? aiColor : (aiColor == PieceColor.White ? PieceColor.Black : PieceColor.White);
-            return EvaluatePosition(perspective);
-        }
-        
-        // MODIFIKOVANO - Odredi boju na osnovu aiColor
-        PieceColor moveColor = maximizing ? aiColor : (aiColor == PieceColor.White ? PieceColor.Black : PieceColor.White);
-        var moves = GetAllPossibleMoves(moveColor);
-        
-        if (maximizing)
-        {
-            float maxEval = float.MinValue;
-            foreach (var move in moves)
-            {
-                var capturedPiece = board.GetPiece(move.to);
-                board.MovePiece(move.from, move.to);
-                
-                float eval = Minimax(depth - 1, false, alpha, beta);
-                
-                board.MovePiece(move.to, move.from);
-                if (capturedPiece != null)
-                    board.SetPiece(move.to, capturedPiece);
-                
-                maxEval = Mathf.Max(maxEval, eval);
-                alpha = Mathf.Max(alpha, eval);
-                
-                if (beta <= alpha)
-                    break;
-            }
-            return maxEval;
-        }
-        else
-        {
-            float minEval = float.MaxValue;
-            foreach (var move in moves)
-            {
-                var capturedPiece = board.GetPiece(move.to);
-                board.MovePiece(move.from, move.to);
-                
-                float eval = Minimax(depth - 1, true, alpha, beta);
-                
-                board.MovePiece(move.to, move.from);
-                if (capturedPiece != null)
-                    board.SetPiece(move.to, capturedPiece);
-                
-                minEval = Mathf.Min(minEval, eval);
-                beta = Mathf.Min(beta, eval);
-                
-                if (beta <= alpha)
-                    break;
-            }
-            return minEval;
-        }
-    }
     // NOVO - javna metoda za evaluaciju trenutne pozicije
     public float EvaluateCurrentPosition(PlayerTurn playerTurn)
     {
@@ -171,7 +54,27 @@ public class ChessAI : MonoBehaviour
     
     private float EvaluatePosition(PieceColor perspectiveColor)
     {
+        // Check for game over conditions first
+        if (board.IsCheckmate(perspectiveColor))
+        {
+            return 100000f; // Very high score for checkmating the opponent
+        }
+        if (board.IsCheckmate(perspectiveColor == PieceColor.White ? PieceColor.Black : PieceColor.White))
+        {
+            return -100000f; // Very low score if AI is checkmated
+        }
+        if (board.IsStalemate(perspectiveColor))
+        {
+            return -50000f; // Significant penalty for stalemate
+        }
+
         float score = 0;
+
+        // Penalty for king in check
+        if (board.IsInCheck(perspectiveColor))
+        {
+            score -= 50f;
+        }
         
         for (int x = 0; x < 8; x++)
         {
@@ -189,7 +92,21 @@ public class ChessAI : MonoBehaviour
             }
         }
         
+        // Mobility factor
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board.GetPiece(new Vector2Int(x, y));
+                if (piece != null && piece.color == perspectiveColor)
+                {
+                    score += board.GetValidMoves(piece).Count * 0.1f; // Small bonus for each valid move
+                }
+            }
+        }
+
         score += EvaluatePositionalFactors(perspectiveColor);
+        score += EvaluateKingSafety(perspectiveColor); // Add king safety score
         
         return score;
     }
@@ -208,6 +125,51 @@ public class ChessAI : MonoBehaviour
         };
     }
     
+
+    private float EvaluateKingSafety(PieceColor color)
+    {
+        float kingSafetyScore = 0;
+        Vector2Int kingPosition = Vector2Int.zero;
+
+        // Find king's position
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board.GetPiece(new Vector2Int(x, y));
+                if (piece != null && piece.type == PieceType.King && piece.color == color)
+                {
+                    kingPosition = piece.position;
+                    break;
+                }
+            }
+        }
+
+        // Check for pawn shield in front of the king
+        int pawnDirection = (color == PieceColor.White) ? 1 : -1;
+        int frontRow = kingPosition.y + pawnDirection;
+
+        // Check squares in front of the king (left, center, right)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            Vector2Int pawnShieldPos = new Vector2Int(kingPosition.x + dx, frontRow);
+            if (board.IsValidPosition(pawnShieldPos))
+            {
+                var piece = board.GetPiece(pawnShieldPos);
+                if (piece != null && piece.type == PieceType.Pawn && piece.color == color)
+                {
+                    kingSafetyScore += 0.5f; // Bonus for pawn in front of king
+                }
+                else
+                {
+                    kingSafetyScore -= 0.2f; // Penalty for missing pawn in front of king
+                }
+            }
+        }
+
+        return kingSafetyScore;
+    }
+
     private float EvaluatePositionalFactors(PieceColor perspectiveColor)
     {
         float score = 0;
@@ -261,13 +223,13 @@ public class ChessAI : MonoBehaviour
         return board.IsCheckmate(PieceColor.White) || board.IsCheckmate(PieceColor.Black);
     }
     
-    private IEnumerator ExecuteAIMove(ChessMove move)
+    public IEnumerator ExecuteAIMove(ChessMove move)
     {
         var piece = board.GetPiece(move.from);
         if (piece == null) yield break;
     
         var pieceAgent = piece.GetComponent<ChessPieceAgent>();
-        pieceAgent.SetState(PieceState.Moving);
+        pieceAgent.SetState(new MovingState());
     
         var pathfinder = piece.GetComponent<ChessPathfinder>();
         var path = pathfinder.FindPath(move.from, move.to);
@@ -299,13 +261,13 @@ public class ChessAI : MonoBehaviour
             gameStats.RecordMove(fromPosition, move.to, piece, capturedPiece, aiColor == PieceColor.White ? PlayerTurn.White : PlayerTurn.Black); // MODIFIKOVANO
         }
     
-        pieceAgent.SetState(PieceState.Idle);
+        pieceAgent.SetState(new IdleState());
     }
     
     private IEnumerator AnimateCapture(ChessPiece piece)
     {
         var agent = piece.GetComponent<ChessPieceAgent>();
-        agent.SetState(PieceState.Captured);
+        agent.SetState(new CapturedState());
     
         var uiManager = ChessGameManager.Instance.GetComponent<ChessUIManager>();
         yield return StartCoroutine(uiManager.FadeOutPiece(piece));

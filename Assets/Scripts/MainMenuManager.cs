@@ -68,7 +68,18 @@ public class MainMenuManager : MonoBehaviour
         mainMenuPanel.SetActive(true);
         difficultyPanel.SetActive(false);
     }
-    
+
+    private void Update()
+    {
+        if (mainMenuPanel.activeInHierarchy || difficultyPanel.activeInHierarchy)
+        {
+            backButton.gameObject.SetActive(true);
+        }
+        else
+        {
+            backButton.gameObject.SetActive(false);
+        }
+    }
     private void QuitGame()
     {
         Application.Quit();

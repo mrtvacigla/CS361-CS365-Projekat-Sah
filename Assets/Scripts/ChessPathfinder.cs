@@ -15,6 +15,8 @@ public class ChessPathfinder : MonoBehaviour
     public List<Vector2Int> FindPath(Vector2Int start, Vector2Int goal)
     {
         board = ChessGameManager.Instance.GetBoard();
+        
+        Debug.Log($"{chessPiece.type} pathfinding: A* from {start} to {goal}");
         return FindPathAStar(start, goal);
     }
 

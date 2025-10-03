@@ -243,14 +243,22 @@ public class TwoPlayerManager : MonoBehaviour
 
             if (!isTwoPlayer && playerIsBlack)
             {
-                boardRotationParent.transform.rotation = Quaternion.Euler(180, 0, 0);
+                SetBoardRotation(Quaternion.Euler(180, 0, 0));
                 CurrentPieceCorrection = Quaternion.Euler(0, 0, 180);
             }
             else
             {
-                boardRotationParent.transform.rotation = Quaternion.Euler(0, 0, 0);
+                SetBoardRotation(Quaternion.Euler(0, 0, 0));
                 CurrentPieceCorrection = Quaternion.identity;
             }
+        }
+    }
+
+    public void SetBoardRotation(Quaternion rotation)
+    {
+        if (boardRotationParent != null)
+        {
+            boardRotationParent.transform.rotation = rotation;
         }
     }
 }

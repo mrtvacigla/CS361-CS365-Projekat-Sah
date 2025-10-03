@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-
+using System.Linq;
 
 
 public enum PieceColor
@@ -13,10 +13,29 @@ public enum PlayerTurn
     White, Black
 }
 
+[System.Serializable]
+public class PieceStateData
+{
+    public PieceType type;
+    public PieceColor color;
+    public Vector2Int position;
+    public bool hasMoved;
+}
+
+[System.Serializable]
+public class BoardState
+{
+    public List<PieceStateData> pieces;
+    public PlayerTurn currentTurn;
+    public bool isGameOver;
+    public Quaternion boardRotation;
+}
+
 public class ChessBoard
 {
     private ChessPiece[,] board = new ChessPiece[8, 8];
-    private List<ChessMove> moveHistory = new List<ChessMove>();
+    public List<ChessMove> moveHistory = new List<ChessMove>();
+    public List<BoardState> boardHistory = new List<BoardState>();
     
     public void InitializeBoard()
     {
@@ -35,11 +54,26 @@ public class ChessBoard
         
         InitializePieceData();
         moveHistory.Clear();
+        boardHistory.Clear(); // Clear board history on new game
+        Debug.Log("ChessBoard.InitializeBoard() called. boardHistory cleared.");
     }
     
     private void InitializePieceData()
     {
-      
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                PieceSetupData setupData = GetInitialSetup(x, y);
+                if (setupData != null)
+                {
+                    // Create a new ChessPiece instance (not a GameObject yet)
+                    ChessPiece newPiece = new GameObject("InternalPiece").AddComponent<ChessPiece>();
+                    newPiece.Initialize(setupData.type, setupData.color, setupData.position);
+                    board[x, y] = newPiece;
+                }
+            }
+        }
     }
     
     public ChessPiece GetPiece(Vector2Int position)
@@ -66,6 +100,70 @@ public class ChessBoard
         board[from.x, from.y] = null;
         board[to.x, to.y] = piece;
         piece.position = to;
+    }
+
+    public void SaveState(PlayerTurn currentTurn, bool isGameOver, Quaternion boardRotation)
+    {
+        List<PieceStateData> currentPieces = new List<PieceStateData>();
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                ChessPiece piece = board[x, y];
+                if (piece != null)
+                {
+                    currentPieces.Add(new PieceStateData
+                    {
+                        type = piece.type,
+                        color = piece.color,
+                        position = piece.position,
+                        hasMoved = piece.hasMoved
+                    });
+                }
+            }
+        }
+        boardHistory.Add(new BoardState { pieces = currentPieces, currentTurn = currentTurn, isGameOver = isGameOver, boardRotation = boardRotation });
+        Debug.Log($"Board state saved. History count: {boardHistory.Count}. Current turn: {currentTurn}");
+    }
+
+    public List<ChessPiece> LoadState(BoardState state)
+    {
+        // Clear current board
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                board[x, y] = null;
+            }
+        }
+
+        List<ChessPiece> loadedPieces = new List<ChessPiece>();
+        // Recreate pieces from state
+        foreach (var pieceData in state.pieces)
+        {
+            ChessPiece newPiece = new GameObject("InternalPiece").AddComponent<ChessPiece>(); // Placeholder
+            newPiece.Initialize(pieceData.type, pieceData.color, pieceData.position);
+            newPiece.hasMoved = pieceData.hasMoved;
+            board[pieceData.position.x, pieceData.position.y] = newPiece;
+            loadedPieces.Add(newPiece);
+        }
+        Debug.Log($"Board state loaded. Pieces on board: {state.pieces.Count}");
+        return loadedPieces;
+    }
+
+    public BoardState Undo()
+    {
+        if (boardHistory.Count > 1) // Keep at least the initial state
+        {
+            Debug.Log($"Undo called. History count before removal: {boardHistory.Count}");
+            boardHistory.RemoveAt(boardHistory.Count - 1); // Remove current state
+            BoardState previousState = boardHistory[boardHistory.Count - 1];
+            Debug.Log($"Undo performed. Loading previous state. History count after removal: {boardHistory.Count}");
+            LoadState(previousState);
+            return previousState;
+        }
+        Debug.Log("Cannot undo further. At initial state.");
+        return boardHistory.Count > 0 ? boardHistory[0] : null; // Return initial state or null if no history
     }
     
     public PieceSetupData GetInitialSetup(int x, int y)
@@ -419,9 +517,32 @@ public class ChessBoard
         
         return true;
     }
+
+    public bool IsStalemate(PieceColor color)
+    {
+        if (IsInCheck(color)) return false; // Not a stalemate if in check
+
+        for (int x = 0; x < 8; x++)
+        {
+            for (int y = 0; y < 8; y++)
+            {
+                var piece = board[x, y];
+                if (piece != null && piece.color == color)
+                {
+                    if (GetValidMoves(piece).Count > 0)
+                    {
+                        return false; // Found at least one legal move, so not a stalemate
+                    }
+                }
+            }
+        }
+
+        return true; // No legal moves and not in check, so it's a stalemate
+    }
     
-    private bool IsValidPosition(Vector2Int position)
+    public bool IsValidPosition(Vector2Int position)
     {
         return position.x >= 0 && position.x < 8 && position.y >= 0 && position.y < 8;
     }
 }
+

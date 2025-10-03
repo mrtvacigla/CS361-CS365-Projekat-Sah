@@ -78,6 +78,31 @@ public class ChessUIManager : MonoBehaviour
         }
     }
     
+    private void CreatePieceObject(PieceSetupData setupData, int x, int y)
+    {
+        GameObject pieceObj = Instantiate(chessPiecePrefab, squareButtons[x, y].transform);
+        ChessPiece chessPiece = pieceObj.GetComponent<ChessPiece>();
+        if (chessPiece != null)
+        {
+            chessPiece.Initialize(setupData.type, setupData.color, setupData.position);
+        }
+        
+        Image pieceImage = pieceObj.GetComponent<Image>();
+        if (pieceImage != null)
+        {
+            Sprite pieceSprite = GetPieceSprite(chessPiece);
+            pieceImage.sprite = pieceSprite;
+        }
+
+        var board = ChessGameManager.Instance.GetBoard();
+        board.SetPiece(new Vector2Int(x, y), chessPiece);
+        
+        pieceObjects[chessPiece] = pieceObj;
+        pieceObj.name = $"{chessPiece.color}_{chessPiece.type}_{x}_{y}";
+        pieceObj.transform.localPosition = Vector3.zero;
+        pieceObj.transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
+    }
+    
 
     public void ResetPiecePosition(ChessPiece piece)
     {
@@ -120,30 +145,7 @@ public class ChessUIManager : MonoBehaviour
         pieceObj.transform.localRotation = targetRot;
     }
 
-    private void CreatePieceObject(PieceSetupData setupData, int x, int y)
-    {
-        GameObject pieceObj = Instantiate(chessPiecePrefab, squareButtons[x, y].transform);
-        ChessPiece chessPiece = pieceObj.GetComponent<ChessPiece>();
-        if (chessPiece != null)
-        {
-            chessPiece.Initialize(setupData.type, setupData.color, setupData.position);
-        }
-        
-        Image pieceImage = pieceObj.GetComponent<Image>();
-        if (pieceImage != null)
-        {
-            Sprite pieceSprite = GetPieceSprite(chessPiece);
-            pieceImage.sprite = pieceSprite;
-        }
-
-        var board = ChessGameManager.Instance.GetBoard();
-        board.SetPiece(new Vector2Int(x, y), chessPiece);
-        
-        pieceObjects[chessPiece] = pieceObj;
-        pieceObj.name = $"{chessPiece.color}_{chessPiece.type}_{x}_{y}";
-        pieceObj.transform.localPosition = Vector3.zero;
-        pieceObj.transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
-    }
+    
     
     public void MovePieceVisually(ChessPiece piece, Vector2Int newPosition)
     {

@@ -123,4 +123,49 @@ public class SteeringBehavior : MonoBehaviour
         Quaternion movingRotation = Quaternion.Euler(0, 0, rotationAmount);
         transform.localRotation = Quaternion.Lerp(transform.localRotation, baseRotation * movingRotation, 0.25f);
     }
+
+    public void ResetHoverEffect()
+    {
+        ResetToCenter();
+    }
+
+    public void ResetShakingEffect()
+    {
+        ResetToCenter();
+    }
+
+    public void ResetDefendingEffect()
+    {
+        ResetToCenter();
+    }
+
+    public void ResetMovingEffect()
+    {
+        ResetToCenter();
+    }
+
+    public IEnumerator FadeOutAndDeactivate(float duration)
+    {
+        SpriteRenderer spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+        {
+            Debug.LogWarning("SpriteRenderer not found on " + gameObject.name);
+            gameObject.SetActive(false);
+            yield break;
+        }
+
+        Color startColor = spriteRenderer.color;
+        Color endColor = new Color(startColor.r, startColor.g, startColor.b, 0f);
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            spriteRenderer.color = Color.Lerp(startColor, endColor, timer / duration);
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        spriteRenderer.color = endColor; // Ensure it's fully transparent
+        gameObject.SetActive(false);
+    }
 }

@@ -27,16 +27,17 @@ public class ChessGameManager : MonoBehaviour
     private ChessUIManager uiManager;
     public GameStatistics gameStats; // NOVO
     public TwoPlayerManager twoPlayerManager; // NOVO
-    
+
     private bool playerIsBlack = false; // NOVO
-    
+    public bool isGameOver = false; // NOVO
+
     public static ChessGameManager Instance { get; private set; }
-    
+
     private void Awake()
     {
         Instance = this;
     }
-    
+
     private void Start()
     {
         chessBoard = new ChessBoard();
@@ -79,6 +80,7 @@ public class ChessGameManager : MonoBehaviour
         currentTurn = PlayerTurn.White;
         selectedPiece = null;
         validMoves = new List<Vector2Int>();
+        isGameOver = false; // Reset game over flag
         
         uiManager.InitializeBoard();
         
@@ -122,6 +124,8 @@ public class ChessGameManager : MonoBehaviour
 
     public void OnSquareClicked(int x, int y)
     {
+        if (isGameOver) return; // Prevent moves if game is over
+
         Vector2Int position = new Vector2Int(x, y);
         // U single-player modu, ignoriši klikove ako je red na AI-ju
         if (twoPlayerManager != null && !twoPlayerManager.isTwoPlayerMode)
@@ -172,41 +176,42 @@ public class ChessGameManager : MonoBehaviour
     
     private void SelectPiece(ChessPiece piece)
     {
-        selectedPiece = piece;
-        validMoves = chessBoard.GetValidMoves(piece);
-    
-        piece.GetComponent<ChessPieceAgent>().SetState(PieceState.Selected);
-    
+                selectedPiece = piece;
+                validMoves = chessBoard.GetValidMoves(piece);
+        
+                piece.GetComponent<ChessPieceAgent>().SetState(new SelectedState());    
         uiManager.HighlightValidMoves(validMoves);
         statusText.text = $"Selected {piece.type} at {piece.position}";
     }
     
-    private void DeselectPiece()
-    {
-        if (selectedPiece != null)
+        private void DeselectPiece()
         {
-            var pieceAgent = selectedPiece.GetComponent<ChessPieceAgent>();
-            pieceAgent.SetState(PieceState.Idle);
-        
-            uiManager.ResetPiecePosition(selectedPiece);
-        }
+            if (selectedPiece != null)
+            {
+                var pieceAgent = selectedPiece.GetComponent<ChessPieceAgent>();
+                pieceAgent.SetState(new IdleState());
     
-        selectedPiece = null;
-        validMoves.Clear();
-        uiManager.ClearHighlights();
-        statusText.text = "Select a piece to move";
-    }
+                uiManager.ResetPiecePosition(selectedPiece);
+            }
     
+            selectedPiece = null;
+            validMoves.Clear();
+            uiManager.ClearHighlights();
+            statusText.text = "Select a piece to move";
+        }    
     private IEnumerator ExecuteMove(ChessPiece piece, Vector2Int targetPosition)
     {
+        if (isGameOver) yield break; // Prevent execution if game is already over
+
         uiManager.ClearHighlights();
         
         var pieceAgent = piece.GetComponent<ChessPieceAgent>();
-        pieceAgent.SetState(PieceState.Moving);
+        pieceAgent.SetState(new MovingState());
         
         var pathfinder = piece.GetComponent<ChessPathfinder>();
         var path = pathfinder.FindPath(piece.position, targetPosition);
         ChessPiece capturedPiece = chessBoard.GetPiece(targetPosition);
+
         Debug.Log($"Captured piece at {targetPosition}: {(capturedPiece != null ? capturedPiece.type.ToString() : "None")}");
 
         Vector2Int fromPosition = piece.position;
@@ -214,8 +219,19 @@ public class ChessGameManager : MonoBehaviour
         // Record move BEFORE animating capture and destroying the piece
         if (gameStats != null)
         {
-            Debug.Log($"Calling gameStats.RecordMove() for piece {piece.type} to {targetPosition}");
-            gameStats.RecordMove(fromPosition, targetPosition, piece, capturedPiece, currentTurn);
+            PlayerTurn playerMakingMove = currentTurn; // Pretpostavi da je trenutni red igrač koji pravi potez
+            if (!twoPlayerManager.isTwoPlayerMode && currentTurn == (playerIsBlack ? PlayerTurn.Black : PlayerTurn.White))
+            {
+                // Ako je single-player mod i trenutni red je igračev, onda je igrač napravio potez
+                playerMakingMove = playerIsBlack ? PlayerTurn.Black : PlayerTurn.White;
+            }
+            else if (!twoPlayerManager.isTwoPlayerMode && currentTurn == (chessAI.aiColor == PieceColor.White ? PlayerTurn.White : PlayerTurn.Black))
+            {
+                // Ako je single-player mod i trenutni red je AI-jev, onda je AI napravio potez
+                playerMakingMove = chessAI.aiColor == PieceColor.White ? PlayerTurn.White : PlayerTurn.Black;
+            }
+            Debug.Log($"Calling gameStats.RecordMove() for piece {piece.type} to {targetPosition} by {playerMakingMove}");
+            gameStats.RecordMove(fromPosition, targetPosition, piece, capturedPiece, playerMakingMove);
         }
         
         if (capturedPiece != null)
@@ -232,6 +248,7 @@ public class ChessGameManager : MonoBehaviour
 
         if (path != null && path.Count > 0)
         {
+            Debug.Log($"Animating movement for {piece.type}. Path length: {path.Count}");
             yield return StartCoroutine(AnimateMovement(piece, path));
         }
         
@@ -257,8 +274,21 @@ public class ChessGameManager : MonoBehaviour
             if (gameStats != null)
                 gameStats.EndGame(winner, "Checkmate");
             
+            isGameOver = true; // Set game over flag
             yield return StartCoroutine(ShowReportAfterDelay(2f));
             
+            yield break;
+        }
+        else if (chessBoard.IsStalemate(opponentColor))
+        {
+            statusText.text = "Stalemate! It's a draw.";
+
+            if (gameStats != null)
+                gameStats.EndGame("Draw", "Stalemate");
+
+            isGameOver = true; // Set game over flag
+            yield return StartCoroutine(ShowReportAfterDelay(2f));
+
             yield break;
         }
         
@@ -292,10 +322,10 @@ public class ChessGameManager : MonoBehaviour
     
     private IEnumerator AnimateCapture(ChessPiece capturedPiece)
     {
+        Debug.Log($"Animating capture for {capturedPiece.type} at {capturedPiece.position}");
         var agent = capturedPiece.GetComponent<ChessPieceAgent>();
-        agent.SetState(PieceState.Captured);
-        
-        yield return StartCoroutine(uiManager.FadeOutPiece(capturedPiece));
+        agent.SetState(new CapturedState());
+        yield return null; // Allow CapturedState to start its fade-out coroutine
     
         chessBoard.SetPiece(capturedPiece.position, null);
         uiManager.RemovePieceVisually(capturedPiece);
@@ -303,6 +333,8 @@ public class ChessGameManager : MonoBehaviour
     
     public void OnAIMoveComplete()
     {
+        if (isGameOver) return; // Prevent turn switch if game is over
+
         // MODIFIKOVANO - Postavi red na igrača
         currentTurn = (chessAI != null && chessAI.aiColor == PieceColor.White) ? PlayerTurn.Black : PlayerTurn.White;
         UpdateUI();
@@ -310,6 +342,13 @@ public class ChessGameManager : MonoBehaviour
     
     private void UpdateUI()
     {
+        if (isGameOver)
+        {
+            turnText.text = ""; // Clear turn text if game is over
+            // statusText will already be set by ExecuteMove for checkmate/stalemate
+            return;
+        }
+
         turnText.text = $"Current Turn: {currentTurn}";
         
         if (chessBoard.IsInCheck(currentTurn == PlayerTurn.White ? PieceColor.White : PieceColor.Black))
