@@ -16,9 +16,12 @@ public class ChessAI : MonoBehaviour
     public AIState currentState = AIState.Idle;
     public int searchDepth = 5;
     public float thinkingTime = 1f;
+    public PieceColor aiColor = PieceColor.Black; // NOVO
     
     private ChessBoard board;
     private AgentCommunication communication;
+    private GameStatistics gameStats; // NOVO
+    private ChessGameManager gameManager; // NOVO
     
     private void Awake()
     {
@@ -30,7 +33,8 @@ public class ChessAI : MonoBehaviour
         yield return new WaitForSeconds(0.5f);
         board = ChessGameManager.Instance.GetBoard();
         communication = GetComponent<AgentCommunication>();
-
+        gameStats = GetComponent<GameStatistics>(); // NOVO
+        gameManager = ChessGameManager.Instance; // NOVO
     }
     
     public IEnumerator MakeAIMove()
@@ -70,7 +74,7 @@ public class ChessAI : MonoBehaviour
     
     private ChessMove GetBestMove()
     {
-        var possibleMoves = GetAllPossibleMoves(PieceColor.Black);
+        var possibleMoves = GetAllPossibleMoves(aiColor); // MODIFIKOVANO
         
         if (possibleMoves.Count == 0)
             return null;
@@ -105,10 +109,13 @@ public class ChessAI : MonoBehaviour
     {
         if (depth == 0 || IsGameOver())
         {
-            return EvaluatePosition();
+            PieceColor perspective = maximizing ? aiColor : (aiColor == PieceColor.White ? PieceColor.Black : PieceColor.White);
+            return EvaluatePosition(perspective);
         }
         
-        var moves = GetAllPossibleMoves(maximizing ? PieceColor.Black : PieceColor.White);
+        // MODIFIKOVANO - Odredi boju na osnovu aiColor
+        PieceColor moveColor = maximizing ? aiColor : (aiColor == PieceColor.White ? PieceColor.Black : PieceColor.White);
+        var moves = GetAllPossibleMoves(moveColor);
         
         if (maximizing)
         {
@@ -128,7 +135,7 @@ public class ChessAI : MonoBehaviour
                 alpha = Mathf.Max(alpha, eval);
                 
                 if (beta <= alpha)
-                    break; 
+                    break;
             }
             return maxEval;
         }
@@ -155,8 +162,14 @@ public class ChessAI : MonoBehaviour
             return minEval;
         }
     }
+    // NOVO - javna metoda za evaluaciju trenutne pozicije
+    public float EvaluateCurrentPosition(PlayerTurn playerTurn)
+    {
+        PieceColor currentPlayerColor = playerTurn == PlayerTurn.White ? PieceColor.White : PieceColor.Black;
+        return EvaluatePosition(currentPlayerColor);
+    }
     
-    private float EvaluatePosition()
+    private float EvaluatePosition(PieceColor perspectiveColor)
     {
         float score = 0;
         
@@ -168,7 +181,7 @@ public class ChessAI : MonoBehaviour
                 if (piece != null)
                 {
                     float pieceValue = GetPieceValue(piece.type);
-                    if (piece.color == PieceColor.Black)
+                    if (piece.color == perspectiveColor)
                         score += pieceValue;
                     else
                         score -= pieceValue;
@@ -176,12 +189,12 @@ public class ChessAI : MonoBehaviour
             }
         }
         
-        score += EvaluatePositionalFactors();
+        score += EvaluatePositionalFactors(perspectiveColor);
         
         return score;
     }
     
-    private float GetPieceValue(PieceType type)
+    public float GetPieceValue(PieceType type)
     {
         return type switch
         {
@@ -195,7 +208,7 @@ public class ChessAI : MonoBehaviour
         };
     }
     
-    private float EvaluatePositionalFactors()
+    private float EvaluatePositionalFactors(PieceColor perspectiveColor)
     {
         float score = 0;
         
@@ -209,7 +222,8 @@ public class ChessAI : MonoBehaviour
             var piece = board.GetPiece(square);
             if (piece != null)
             {
-                if (piece.color == PieceColor.Black)
+                // MODIFIKOVANO - Evaluacija na osnovu perspectiveColor
+                if (piece.color == perspectiveColor)
                     score += 0.3f;
                 else
                     score -= 0.3f;
@@ -261,7 +275,7 @@ public class ChessAI : MonoBehaviour
         var capturedPiece = board.GetPiece(move.to);
         if (capturedPiece != null)
         {
-            communication.BroadcastThreat(move.to, PieceColor.Black);
+            communication.BroadcastThreat(move.to, aiColor); // MODIFIKOVANO
             yield return StartCoroutine(AnimateCapture(capturedPiece));
         }
     
@@ -272,11 +286,18 @@ public class ChessAI : MonoBehaviour
             yield return StartCoroutine(steeringBehavior.MoveTo(worldPos));
         }
     
+        Vector2Int fromPosition = piece.position;
         board.MovePiece(move.from, move.to);
         piece.position = move.to;
     
         var uiManager = ChessGameManager.Instance.GetComponent<ChessUIManager>();
         uiManager.MovePieceVisually(piece, move.to);
+    
+        // NOVO - zabeleži AI potez u statistici
+        if (gameStats != null)
+        {
+            gameStats.RecordMove(fromPosition, move.to, piece, capturedPiece, aiColor == PieceColor.White ? PlayerTurn.White : PlayerTurn.Black); // MODIFIKOVANO
+        }
     
         pieceAgent.SetState(PieceState.Idle);
     }

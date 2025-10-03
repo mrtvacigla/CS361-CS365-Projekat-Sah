@@ -99,8 +99,9 @@ public class ChessUIManager : MonoBehaviour
         Quaternion startRot = pieceObj.transform.localRotation;
     
         Vector3 targetPos = Vector3.zero;
-        Quaternion targetRot = Quaternion.Euler(0, 0, 0);
-
+        
+        // ISPRAVKA: Preuzmi tačnu rotaciju na osnovu stanja igre
+        Quaternion targetRot = TwoPlayerManager.CurrentPieceCorrection;
         float duration = 0.5f;
         float elapsed = 0f;
 
@@ -141,6 +142,7 @@ public class ChessUIManager : MonoBehaviour
         pieceObjects[chessPiece] = pieceObj;
         pieceObj.name = $"{chessPiece.color}_{chessPiece.type}_{x}_{y}";
         pieceObj.transform.localPosition = Vector3.zero;
+        pieceObj.transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
     }
     
     public void MovePieceVisually(ChessPiece piece, Vector2Int newPosition)
@@ -155,8 +157,9 @@ public class ChessUIManager : MonoBehaviour
         var newParent = squareButtons[newPosition.x, newPosition.y].transform;
         pieceObj.transform.SetParent(newParent);
         pieceObj.transform.localPosition = Vector3.zero;
-        pieceObj.transform.localRotation = Quaternion.Euler(0,0,0);
-        pieceObj.transform.rotation = Quaternion.Euler(0,0,0);
+
+        // Ispravno postavi rotaciju nakon poteza
+        pieceObj.transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
         
         pieceObj.name = $"{piece.color}_{piece.type}_{newPosition.x}_{newPosition.y}";
     }

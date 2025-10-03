@@ -80,6 +80,7 @@ public class ChessPieceAgent : MonoBehaviour
             {
                 transform.localPosition = Vector3.Lerp(transform.localPosition, Vector3.zero, Time.deltaTime * 5f);
             }
+            transform.localRotation = TwoPlayerManager.CurrentPieceCorrection;
         }
     
     }
